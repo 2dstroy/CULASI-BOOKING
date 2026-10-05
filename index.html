@@ -1,85 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Truck Departure Form</title>
-<style>
-  :root { --bg:#f3f4f6; --card:#fff; --text:#111827; --muted:#6b7280; --accent:#d97706; --border:#d1d5db; }
-  * { box-sizing:border-box; }
-  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-         background:var(--bg); color:var(--text); font-family:system-ui,Arial,sans-serif; padding:16px; }
-  .card { background:var(--card); width:100%; max-width:420px; padding:24px; border-radius:12px;
-          box-shadow:0 4px 16px rgba(0,0,0,.1); }
-  h1 { margin:0 0 4px; font-size:22px; }
-  p.sub { margin:0 0 20px; color:var(--muted); font-size:14px; }
-  label { display:block; margin:14px 0 6px; font-weight:600; font-size:14px; }
-  input { width:100%; padding:12px; font-size:16px; border:1px solid var(--border); border-radius:8px; }
-  input:focus { outline:2px solid var(--accent); border-color:var(--accent); }
-  button { margin-top:22px; width:100%; padding:14px; font-size:16px; font-weight:700; color:#fff;
-           background:var(--accent); border:0; border-radius:8px; cursor:pointer; }
-  button:disabled { opacity:.6; cursor:wait; }
-  #msg { margin-top:14px; text-align:center; font-size:14px; min-height:20px; }
-  .ok { color:#15803d; } .err { color:#b91c1c; }
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>🚚 Truck Departure</h1>
-  <p class="sub">Fill in the details and submit. It goes straight to the Google Sheet.</p>
-
-  <form id="f" autocomplete="off">
-    <label for="truck">Trucking Name</label>
-    <input id="truck" name="truckingName" required>
-
-    <label for="date">Date of Departure</label>
-    <input id="date" name="departureDate" type="date" required>
-
-    <label for="plate">Plate Number</label>
-    <input id="plate" name="plateNumber" required style="text-transform:uppercase" placeholder="e.g. CCR 8351">
-
-    <label for="contact">Contact Number</label>
-    <input id="contact" name="contactNumber" type="tel" required placeholder="e.g. 09218010894">
-
-    <button id="btn" type="submit">Submit</button>
-    <div id="msg"></div>
-  </form>
-</div>
-
-<script>
-  // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE (ends with /exec)
- const SCRIPT_URL = "hhttps://script.google.com/a/macros/starliteferries.com/s/AKfycbxkP3YAYCJbkF_kJ2WWJgZn5l40QeAMBDVZOelTNjyobO6GrE6YjIBP9Ts4vtu9KWuvtQ/exec";
-
-  const form = document.getElementById("f");
-  const btn = document.getElementById("btn");
-  const msg = document.getElementById("msg");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (SCRIPT_URL.startsWith("PASTE")) {
-      msg.className = "err";
-      msg.textContent = "Setup not finished: add the Web App URL in index.html.";
-      return;
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ROXAS → BATANGAS Booking</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #f0f4f8; margin: 0; padding: 20px; }
+    .container { 
+      max-width: 520px; 
+      margin: 0 auto; 
+      background: white; 
+      border-radius: 16px; 
+      padding: 28px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
     }
-    btn.disabled = true;
-    msg.className = "";
-    msg.textContent = "Sending...";
-    try {
-      await fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors", // Apps Script does not send CORS headers; the data still arrives
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(new FormData(form)).toString()
-      });
-      msg.className = "ok";
-      msg.textContent = "✅ Submitted! Saved to Google Sheet.";
-      form.reset();
-    } catch (err) {
-      msg.className = "err";
-      msg.textContent = "❌ Failed to send. Check your internet and try again.";
+    h1 { margin: 0 0 6px; font-size: 1.6rem; color: #1a365d; }
+    .subtitle { color: #64748b; margin-bottom: 24px; font-size: 0.95rem; }
+    label { 
+      display: block; 
+      font-weight: 600; 
+      margin: 14px 0 6px; 
+      color: #334155; 
+      font-size: 0.9rem; 
     }
-    btn.disabled = false;
-  });
-</script>
-</body>
-</html>
+    input, select, textarea {
+      width: 100%; 
+      padding: 12px 14px; 
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px; 
+      font-size: 1rem; 
+      transition: border 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { 
+      outline: none; 
+      border-color: #3b82f6; 
+    }
+    .row { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 14px; 
+    }
+    button {
+      width: 100%; 
+      margin-top: 24px; 
+      padding: 14px; 
+      background: #2563eb;
+      color: white; 
+      border: none; 
+      border-radius: 10px; 
+      font-size: 1.05rem;
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: background 0.2s;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    .success { 
+      background: #dcfce7; 
+      color: #166534; 
+      padding: 14px; 
+      border-radius: 10px; 
+      margin-top: 18px; 
+    }
+    .error { 
+      background: #fee2e2; 
+      color: #991b1b; 
+      padding: 14px; 
+      border-radius: 10px; 
+      margin-top: 18px; 
+    }
+    .note { 
+      font-size: 0.85rem; 
+      color: #64748b; 
+      margin-top: 18px
