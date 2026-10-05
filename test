@@ -1,0 +1,92 @@
+// ===== TRUCK BOOKING BACKEND (Google Apps Script) =====
+const SHEET_ID = "10eOOT93sBGknCyHKjoNYnII6YLq97uMwy4vGoIOAHk0"; // from your sheet link: /d/<THIS PART>/edit
+const ROUTE = "ROXAS CULASI TO BATANGAS";                          // title shown on new tabs
+const HEADERS = ["No.","Type of Vehicle","Company Name","Plate Number","Contact Number","Remarks","BOOKED BY","DATE","TIME"];
+const MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+
+// Opens the form (Apps Script web app version)
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile("Index")
+    .setTitle("Truck Booking")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1");
+}
+
+// Receives the form (standalone HTML version)
+function doPost(e) {
+  let out;
+  try { out = submitBooking(JSON.parse(e.postData.contents)); }
+  catch (err) { out = { ok: false, message: String(err.message || err) }; }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function submitBooking(d) {
+  const up = v => String(v || "").trim().toUpperCase();
+  const company = up(d.company), plate = up(d.plate), by = up(d.bookedBy), remarks = up(d.remarks);
+  const type = up(d.type) || "10W";
+  const contact = String(d.contact || "").trim();
+  const time = d.time === "1:00 PM" ? "1:00 PM" : "1:00 AM";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || "") || !company || !plate || !by) {
+    throw new Error("Please fill in Date, Company Name, Plate Number and Booked By.");
+  }
+
+  const [y, m, day] = d.date.split("-").map(Number);
+  const month = MONTHS[m - 1];
+  const suffix = time === "1:00 PM" ? "1PM" : "1AM";
+  const tabName = month + " " + day + "," + y + "-" + suffix;       // e.g. MARCH 4,2026-1AM
+  const dateText = month + " " + day + ", " + y;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+
+    // Find the tab (ignores spaces, dots and upper/lower case; accepts FEB/FEBRUARY)
+    const norm = s => String(s).toUpperCase().replace(/[\s.]/g, "");
+    const wanted = [norm(tabName), norm(month.slice(0, 3) + " " + day + "," + y + "-" + suffix)];
+    let sheet = ss.getSheets().filter(s => wanted.indexOf(norm(s.getName())) > -1)[0];
+
+    // Create it if missing
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+      sheet.getRange("A1:I1").merge().setValue(time + " " + ROUTE)
+        .setFontWeight("bold").setHorizontalAlignment("center").setBackground("#cfe2f3");
+      sheet.getRange(2, 1, 1, 9).setValues([HEADERS])
+        .setFontWeight("bold").setHorizontalAlignment("center").setBackground("#f9c6e8").setWrap(true);
+      sheet.setFrozenRows(2);
+      sheet.setColumnWidths(1, 9, 110);
+    }
+
+    // Find the header row (the row that contains "Company Name")
+    let headerRow = 2;
+    const top = sheet.getRange(1, 1, Math.min(10, sheet.getMaxRows()), 9).getValues();
+    for (let r = 0; r < top.length; r++) {
+      if (top[r].some(c => String(c).trim().toLowerCase() === "company name")) { headerRow = r + 1; break; }
+    }
+
+    // Find next empty row (first numbered/blank row with empty Company Name)
+    const last = Math.max(sheet.getLastRow(), headerRow + 1);
+    const data = sheet.getRange(headerRow + 1, 1, last - headerRow, 9).getValues();
+    let row = -1, maxNo = 0;
+    for (let i = 0; i < data.length; i++) {
+      const a = String(data[i][0]).trim(), c = String(data[i][2]).trim();
+      if (a !== "" && !/^\d+$/.test(a)) {          // a label row such as "CHANCE": main list is full
+        if (row === -1) { row = headerRow + 1 + i; sheet.insertRowBefore(row); }
+        break;
+      }
+      if (/^\d+$/.test(a)) maxNo = Math.max(maxNo, Number(a));
+      if (row === -1 && c === "") row = headerRow + 1 + i;
+    }
+    if (row === -1) row = last + 1;
+
+    const existing = String(sheet.getRange(row, 1).getValue()).trim();
+    const no = /^\d+$/.test(existing) ? Number(existing) : maxNo + 1;
+
+    sheet.getRange(row, 2, 1, 8).setNumberFormat("@")
+      .setValues([[type, company, plate, contact, remarks, by, dateText, time]]);
+    sheet.getRange(row, 1).setValue(no);
+
+    return { ok: true, message: "Booked! " + company + " (" + plate + ") saved to \"" + sheet.getName() + "\" as No. " + no + "." };
+  } finally {
+    lock.releaseLock();
+  }
+}
