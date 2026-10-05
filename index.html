@@ -151,4 +151,106 @@
       <input id="contact" type="tel" placeholder="e.g. 09218010894">
 
       <label for="remarks">Remarks</label>
-      <textarea...
+      <textarea id="remarks" class="up" rows="2"></textarea>
+
+      <label class="req" for="bookedBy">Booked By</label>
+      <input id="bookedBy" class="up" required>
+
+      <button id="btn" type="submit">Submit Booking</button>
+      <div id="msg"></div>
+    </form>
+  </div>
+
+  <script>
+    // ========== YOUR WEB APP URL ==========
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1GggA7uj1WJNIr7uQg_cqeOq1GZsSdwUUL8F5KnKG1mEjli7J0_xDHxueVfSJHY1nsQ/exec";
+
+    const $ = id => document.getElementById(id);
+    const msg = $("msg");
+    const btn = $("btn");
+
+    // Set today's date as default
+    const today = new Date();
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    $("date").value = today.toISOString().slice(0, 10);
+
+    // Show/hide "Other" vehicle type
+    $("type").addEventListener("change", () => {
+      $("typeOther").hidden = $("type").value !== "Other";
+    });
+
+    // Force UPPERCASE while typing
+    ["company", "plate", "remarks", "bookedBy", "typeOther"].forEach(id => {
+      $(id).addEventListener("input", e => {
+        const start = e.target.selectionStart;
+        e.target.value = e.target.value.toUpperCase();
+        e.target.setSelectionRange(start, start);
+      });
+    });
+
+    function send(data) {
+      return new Promise((resolve, reject) => {
+        // Inside Google Apps Script
+        if (window.google && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .submitBooking(data);
+        } 
+        // Standalone mode
+        else {
+          fetch(SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(data)
+          })
+          .then(r => r.json())
+          .then(resolve)
+          .catch(() => reject(new Error("Network error. Please try again.")));
+        }
+      });
+    }
+
+    $("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = {
+        date: $("date").value,
+        time: $("time").value,
+        type: $("type").value === "Other" ? $("typeOther").value : $("type").value,
+        company: $("company").value.trim(),
+        plate: $("plate").value.trim(),
+        contact: $("contact").value.trim(),
+        remarks: $("remarks").value.trim(),
+        bookedBy: $("bookedBy").value.trim()
+      };
+
+      btn.disabled = true;
+      btn.textContent = "Sending...";
+      msg.className = "";
+      msg.textContent = "";
+
+      try {
+        const res = await send(data);
+
+        msg.className = res.ok ? "ok" : "err";
+        msg.textContent = (res.ok ? "✅ " : "❌ ") + res.message;
+
+        if (res.ok) {
+          // Clear fields for next booking (keep Date, Time, and Booked By)
+          ["company", "plate", "contact", "remarks", "typeOther"].forEach(id => $(id).value = "");
+          $("type").value = "10W";
+          $("typeOther").hidden = true;
+          $("company").focus();
+        }
+      } catch (err) {
+        msg.className = "err";
+        msg.textContent = "❌ " + (err.message || err);
+      }
+
+      btn.disabled = false;
+      btn.textContent = "Submit Booking";
+    });
+  </script>
+</body>
+</html>
