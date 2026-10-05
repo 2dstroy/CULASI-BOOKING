@@ -1,151 +1,154 @@
-// =============================================
-// GOOGLE APPS SCRIPT - Truck Booking Backend
-// =============================================
-
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')  // Name of the HTML file
-    .setTitle('Truck Booking - Roxas to Batangas')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const result = submitBooking(data);
-    return ContentService
-      .createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, message: err.message }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * Main booking function
- * Called by both google.script.run and fetch (standalone)
- */
-function submitBooking(data) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    // Normalize time
-    let time = data.time || "1:00 AM";
-    if (time.includes("AM")) time = "1AM";
-    if (time.includes("PM")) time = "1PM";
-
-    // Try to find the correct sheet
-    const sheet = findOrCreateSheet(ss, data.date, time);
-
-    // Find next empty row (based on Company Name column - column C)
-    const lastRow = sheet.getLastRow();
-    let nextRow = lastRow + 1;
-
-    // Better way: scan for first empty company name
-    if (lastRow >= 1) {
-      const companyValues = sheet.getRange(2, 3, lastRow, 1).getValues();
-      for (let i = 0; i < companyValues.length; i++) {
-        if (!companyValues[i][0] || companyValues[i][0].toString().trim() === "") {
-          nextRow = i + 2;
-          break;
-        }
-      }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Truck Booking - Roxas to Batangas</title>
+  <style>
+    :root {
+      --bg: #eef1f5;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #d97706;
+      --border: #d1d5db;
     }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Arial, sans-serif;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      width: 100%;
+      max-width: 480px;
+      padding: 24px;
+      border-radius: 14px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.1);
+      align-self: flex-start;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+    }
+    p.sub {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .req::after {
+      content: " *";
+      color: #dc2626;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid var(--accent);
+      border-color: var(--accent);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .up { text-transform: uppercase; }
+    button {
+      margin-top: 22px;
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent);
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+    #msg {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+    .ok {
+      display: block !important;
+      background: #dcfce7;
+      color: #166534;
+    }
+    .err {
+      display: block !important;
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🚚 Truck Booking</h1>
+    <p class="sub">Roxas → Batangas • Fields marked * are required</p>
 
-    // Auto number
-    const no = nextRow - 1;
+    <form id="f" autocomplete="off">
+      <div class="row">
+        <div>
+          <label class="req" for="date">Departure Date</label>
+          <input id="date" type="date" required>
+        </div>
+        <div>
+          <label for="time">Time</label>
+          <select id="time">
+            <option value="1:00 AM">1:00 AM</option>
+            <option value="1:00 PM">1:00 PM</option>
+          </select>
+        </div>
+      </div>
 
-    // Prepare data (force uppercase)
-    const rowData = [
-      no,
-      (data.type || "10W").toString().toUpperCase(),
-      (data.company || "").toString().toUpperCase().trim(),
-      (data.plate || "").toString().toUpperCase().trim(),
-      (data.contact || "").toString().trim(),
-      (data.remarks || "").toString().toUpperCase().trim(),
-      (data.bookedBy || "").toString().toUpperCase().trim(),
-      data.date,
-      data.time
-    ];
+      <label for="type">Type of Vehicle</label>
+      <select id="type">
+        <option value="10W" selected>10W</option>
+        <option value="20FTR">20FTR</option>
+        <option value="40FTR">40FTR</option>
+        <option value="FWD">FWD</option>
+        <option value="ELF">ELF</option>
+        <option value="6W">6W</option>
+        <option value="12W">12W</option>
+        <option value="Other">Other</option>
+      </select>
+      <input id="typeOther" class="up" placeholder="Type the vehicle type" hidden style="margin-top:8px">
 
-    // Write to sheet
-    sheet.getRange(nextRow, 1, 1, 9).setValues([rowData]);
+      <label class="req" for="company">Company Name</label>
+      <input id="company" class="up" required>
 
-    return {
-      ok: true,
-      message: `Booked successfully! → Sheet: "${sheet.getName()}" (Row ${nextRow})`
-    };
+      <label class="req" for="plate">Plate Number</label>
+      <input id="plate" class="up" required placeholder="e.g. CCR 8351">
 
-  } catch (err) {
-    return {
-      ok: false,
-      message: "Error: " + err.message
-    };
-  }
-}
+      <label for="contact">Contact Number</label>
+      <input id="contact" type="tel" placeholder="e.g. 09218010894">
 
-/**
- * Smart sheet finder + creator
- */
-function findOrCreateSheet(ss, dateStr, time) {
-  const possibleNames = generatePossibleSheetNames(dateStr, time);
-
-  // Try existing sheets first
-  for (let name of possibleNames) {
-    const sheet = ss.getSheetByName(name);
-    if (sheet) return sheet;
-  }
-
-  // Create new sheet if none found
-  const newName = possibleNames[0]; // Use the first preferred name
-  const sheet = ss.insertSheet(newName);
-
-  // Add headers
-  const headers = [
-    "No.", "Type of Vehicle", "Company Name", "Plate Number",
-    "Contact Number", "Remarks", "BOOKED BY", "DATE", "TIME"
-  ];
-  sheet.getRange(1, 1, 1, 9).setValues([headers]);
-  sheet.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#f3f4f6");
-  sheet.setFrozenRows(1);
-
-  return sheet;
-}
-
-/**
- * Generate possible sheet name variations
- */
-function generatePossibleSheetNames(dateStr, time) {
-  const names = [];
-  const d = new Date(dateStr + "T00:00:00");
-
-  if (isNaN(d.getTime())) {
-    // Fallback if date is invalid
-    names.push(`${dateStr}-${time}`);
-    names.push(`${dateStr} ${time}`);
-    names.push(dateStr);
-    return names;
-  }
-
-  const months = [
-    "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
-    "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
-  ];
-
-  const month = months[d.getMonth()];
-  const day = d.getDate();
-  const year = d.getFullYear();
-
-  // Most common formats based on your Excel
-  names.push(`${month} ${day},${year}-${time}`);
-  names.push(`${month} ${day},${year}`);
-  names.push(`${month} ${day}`);
-  names.push(`${month} ${day} ${year}`);
-  names.push(`${dateStr}-${time}`);
-  names.push(`${dateStr}`);
-  names.push(`${month} ${day},${year}-1AM`);
-  names.push(`${month} ${day},${year}-1PM`);
-
-  return names;
-}
+      <label for="remarks">Remarks</label>
+      <textarea...
